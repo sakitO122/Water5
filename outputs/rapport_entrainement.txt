@@ -1,9 +1,10 @@
 RAPPORT ENTRAÎNEMENT — IRRIGATION CI (2022-2024)
+Split : chronologique 80/20 | CV : TimeSeriesSplit(5)
 ==================================================
 CLASSIFICATION :
-  RF_Classifier: F1=1.0000 Acc=1.0000 CV=0.9963
-  XGB_Classifier: F1=1.0000 Acc=1.0000 CV=0.9991
+  RF_Classifier: F1=0.9955 Acc=0.9955 CV=0.9967
+  XGB_Classifier: F1=0.9955 Acc=0.9955 CV=0.9956
 
 RÉGRESSION :
-  RF_Regressor: R²=0.9954 MAE=23.1L
-  XGB_Regressor: R²=0.9970 MAE=19.0L
+  RF_Regressor: R²=0.9947 MAE=22.3L
+  XGB_Regressor: R²=0.9968 MAE=18.4L

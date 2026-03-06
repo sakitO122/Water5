@@ -1,7 +1,7 @@
 """
 =============================================================
  SYSTÈME D'IRRIGATION INTELLIGENTE — CÔTE D'IVOIRE
- Étape 2 : Entraînement ML (Random Forest + XGBoost)
+ 02_entrainement_ml.py
 =============================================================
  Dataset   : 2022-2024 (1096 jours)
  Modèles   :
@@ -9,8 +9,23 @@
    B — XGBClassifier           → décision OUI/NON (comparaison)
    C — RandomForestRegressor   → volume (litres)
    D — XGBRegressor            → volume (litres) (comparaison)
+
+ Corrections apportées :
+   ✔ Split CHRONOLOGIQUE (pas aléatoire) — évite le leakage temporel
+   ✔ Cross-validation TimeSeriesSplit (pas KFold standard)
+   ✔ Séparation stricte train/test avant tout calcul
 =============================================================
 """
+
+import os as _os, sys as _sys
+# ── Résolution robuste du chemin src/ ─────────────────────────────────────
+# Fonctionne depuis : python src/fichier.py  |  python fichier.py  |  chemin absolu
+_THIS_DIR   = _os.path.dirname(_os.path.abspath(__file__))
+_PARENT_DIR = _os.path.dirname(_THIS_DIR)
+for _p in (_THIS_DIR, _PARENT_DIR, _os.path.join(_PARENT_DIR, 'src')):
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
+# ──────────────────────────────────────────────────────────────────────────
 
 import os, sys, warnings, joblib
 import numpy as np
@@ -20,123 +35,147 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from sklearn.ensemble        import RandomForestClassifier, RandomForestRegressor
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics         import (accuracy_score, f1_score,
-                                     mean_absolute_error, r2_score,
-                                     mean_squared_error, classification_report,
-                                     confusion_matrix)
+from sklearn.model_selection import TimeSeriesSplit, cross_val_score
+from sklearn.metrics         import (
+    accuracy_score, f1_score, mean_absolute_error,
+    r2_score, mean_squared_error, classification_report, confusion_matrix,
+)
 warnings.filterwarnings("ignore")
 
-# ─── Chemins ────────────────────────────────────────────────
-BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_DIR  = os.path.join(BASE_DIR, "data")
-MODEL_DIR = os.path.join(BASE_DIR, "models")
-OUT_DIR   = os.path.join(BASE_DIR, "outputs")
-os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(OUT_DIR,   exist_ok=True)
+from config import (
+    CSV_CLEAN, MODEL_DIR, OUT_DIR,
+    FEATURES, TARGET_CLF, TARGET_REG,
+)
+from agronomie import kc_tomate, get_stade
 
-CSV_CLEAN = os.path.join(DATA_DIR, "yamoussoukro_dataset_ML.csv")
-
-# ─── XGBoost optionnel ──────────────────────────────────────
+# ── XGBoost optionnel ────────────────────────────────────────
 try:
     from xgboost import XGBClassifier, XGBRegressor
     XGBOOST_OK = True
     print("✅ XGBoost disponible")
 except ImportError:
     XGBOOST_OK = False
-    print("⚠️  XGBoost absent → pip install xgboost\n   RF uniquement.")
-
-# ─── Features ───────────────────────────────────────────────
-FEATURES = [
-    "humidite_sol_moy_pct", "humidite_sol_min_pct", "humidite_sol_0_7_moy",
-    "temp_max_C", "temp_min_C", "temp_moy_C", "humidite_air_moy_pct",
-    "vent_u2_ms", "rayonnement_Rs_MJ", "ET0_reference_mm", "ETc_mm",
-    "deficit_hydrique_mm", "pluie_totale_mm", "pluie_effective_mm",
-    "jour_annee", "mois",
-]
-TARGET_C = "irriguer"
-TARGET_R = "volume_litres"
-KC_MOYEN = 1.05
+    print("⚠  XGBoost absent → pip install xgboost   (RF uniquement)")
 
 
 # ══════════════════════════════════════════════════════════════
-# 1. CHARGEMENT
+# 1. CHARGEMENT + SPLIT CHRONOLOGIQUE
 # ══════════════════════════════════════════════════════════════
-def charger():
+
+def charger_et_splitter() -> tuple:
+    """
+    Charge le dataset et effectue un split CHRONOLOGIQUE 80/20.
+
+    CORRECTION : train_test_split aléatoire remplacé par un split
+    temporel strict. Le modèle entraîné sur 2022–2023 est évalué
+    sur 2024 uniquement — ce qui est la seule évaluation réaliste
+    pour des données de séries temporelles.
+    """
     print("📂 Chargement du dataset 2022-2024...")
     df = pd.read_csv(CSV_CLEAN, parse_dates=["date"])
+    df = df.sort_values("date").reset_index(drop=True)
 
-    # Recalcul des colonnes dérivées (compatibilité anciens CSV)
-    df["ETc_mm"]              = (df["ET0_reference_mm"] * KC_MOYEN).round(2)
-    df["pluie_effective_mm"]  = (df["pluie_totale_mm"]  * 0.80).round(2)
-    df["deficit_hydrique_mm"] = (df["ETc_mm"] - df["pluie_effective_mm"]).round(2)
+    # Recalcul colonnes dérivées si absentes
     if "annee" not in df.columns:
-        df["annee"] = pd.to_datetime(df["date"]).dt.year
+        df["annee"] = df["date"].dt.year
     if "mois" not in df.columns:
-        df["mois"] = pd.to_datetime(df["date"]).dt.month
+        df["mois"] = df["date"].dt.month
     if "jour_annee" not in df.columns:
-        df["jour_annee"] = pd.to_datetime(df["date"]).dt.dayofyear
+        df["jour_annee"] = df["date"].dt.dayofyear
     if "saison" not in df.columns:
-        df["saison"] = df["mois"].map(lambda m:
-            "seche" if m in [11,12,1,2,3] else
-            "grande_pluie" if m in [6,7,8,9] else "petite_pluie")
+        from agronomie import get_saison
+        df["saison"] = df["mois"].map(get_saison)
+    if "kc_dynamique" not in df.columns:
+        df["kc_dynamique"] = 1.05   # fallback
+    if "ETc_mm" not in df.columns:
+        from config import PLUIE_EFFECTIVE_PCT
+        df["ETc_mm"]              = (df["ET0_reference_mm"] * df["kc_dynamique"]).round(2)
+        df["pluie_effective_mm"]  = (df["pluie_totale_mm"]  * PLUIE_EFFECTIVE_PCT).round(2)
+        df["deficit_hydrique_mm"] = (df["ETc_mm"] - df["pluie_effective_mm"]).round(2)
 
     manquantes = [f for f in FEATURES if f not in df.columns]
     if manquantes:
-        print(f"❌ Colonnes manquantes : {manquantes}"); sys.exit(1)
+        print(f"❌ Colonnes manquantes : {manquantes}")
+        sys.exit(1)
 
-    df.dropna(subset=FEATURES + [TARGET_C, TARGET_R], inplace=True)
-    print(f"   ✅ {len(df)} observations | "
-          f"{sorted(df['annee'].unique().tolist())}")
-    return df
+    df.dropna(subset=FEATURES + [TARGET_CLF, TARGET_REG], inplace=True)
+
+    # ── Split chronologique 80 % / 20 % ───────────────────
+    cut    = int(len(df) * 0.80)
+    train  = df.iloc[:cut].copy()
+    test   = df.iloc[cut:].copy()
+
+    date_cut = df.iloc[cut]["date"]
+    print(f"   ✅ {len(df)} observations | {sorted(df['annee'].unique().tolist())}")
+    print(f"   📅 Train : {train['date'].min().date()} → {train['date'].max().date()} "
+          f"({len(train)} j)")
+    print(f"   📅 Test  : {test['date'].min().date()} → {test['date'].max().date()} "
+          f"({len(test)} j)")
+    return df, train, test
 
 
 # ══════════════════════════════════════════════════════════════
 # 2. CLASSIFICATION
 # ══════════════════════════════════════════════════════════════
-def entrainer_classification(df):
-    print("\n" + "═"*58)
+
+def entrainer_classification(df: pd.DataFrame,
+                              train: pd.DataFrame,
+                              test: pd.DataFrame) -> tuple:
+    print("\n" + "═" * 60)
     print("  MODÈLE A — CLASSIFICATION : Irriguer OUI/NON")
-    print("═"*58)
+    print("═" * 60)
 
-    X = df[FEATURES]
-    y = df[TARGET_C].astype(int)
-    X_tr, X_te, y_tr, y_te = train_test_split(
-        X, y, test_size=0.20, random_state=42, stratify=y)
-    print(f"  Train : {len(X_tr)} | Test : {len(X_te)}")
-    print(f"  NON : {(y==0).sum()} | OUI : {(y==1).sum()}")
+    X_tr = train[FEATURES];  y_tr = train[TARGET_CLF].astype(int)
+    X_te = test[FEATURES];   y_te = test[TARGET_CLF].astype(int)
+    X    = df[FEATURES];     y    = df[TARGET_CLF].astype(int)
 
+    print(f"  Train — NON : {(y_tr==0).sum()} | OUI : {(y_tr==1).sum()}")
+    print(f"  Test  — NON : {(y_te==0).sum()} | OUI : {(y_te==1).sum()}")
+
+    # ── TimeSeriesSplit (5 folds) ──────────────────────────
+    tscv = TimeSeriesSplit(n_splits=5)
     resultats = {}
 
     # ── Random Forest ──────────────────────────────────────
     print("\n  [1/2] Random Forest Classifier...")
     rf = RandomForestClassifier(
         n_estimators=300, max_depth=12, min_samples_leaf=2,
-        class_weight="balanced", random_state=42, n_jobs=-1)
+        class_weight="balanced", random_state=42, n_jobs=-1,
+    )
     rf.fit(X_tr, y_tr)
-    yp = rf.predict(X_te)
-    f1 = f1_score(y_te, yp, average="weighted")
-    ac = accuracy_score(y_te, yp)
-    cv = cross_val_score(rf, X, y, cv=5, scoring="f1_weighted")
-    print(f"     Accuracy : {ac:.4f} | F1 : {f1:.4f} | CV : {cv.mean():.4f}±{cv.std():.4f}")
-    print(classification_report(y_te, yp, target_names=["NON","OUI"]))
-    resultats["RF_Classifier"] = {"model":rf,"f1":f1,"accuracy":ac,"cv_mean":cv.mean(),"y_pred":yp}
+    yp_rf = rf.predict(X_te)
+    f1_rf = f1_score(y_te, yp_rf, average="weighted")
+    ac_rf = accuracy_score(y_te, yp_rf)
+    # ✅ CORRECTION : TimeSeriesSplit au lieu de KFold
+    cv_rf = cross_val_score(rf, X, y, cv=tscv, scoring="f1_weighted")
+    print(f"   Accuracy : {ac_rf:.4f} | F1 : {f1_rf:.4f} "
+          f"| CV-TS : {cv_rf.mean():.4f}±{cv_rf.std():.4f}")
+    print(classification_report(y_te, yp_rf, target_names=["NON", "OUI"]))
+    resultats["RF_Classifier"] = {
+        "model": rf, "f1": f1_rf, "accuracy": ac_rf,
+        "cv_mean": cv_rf.mean(), "y_pred": yp_rf,
+    }
 
     # ── XGBoost ────────────────────────────────────────────
     if XGBOOST_OK:
         print("\n  [2/2] XGBoost Classifier...")
-        ratio = (y==0).sum()/(y==1).sum()
+        ratio = (y_tr == 0).sum() / max((y_tr == 1).sum(), 1)
         xgb = XGBClassifier(
             n_estimators=300, max_depth=6, learning_rate=0.05,
             scale_pos_weight=ratio, random_state=42,
-            eval_metric="logloss", verbosity=0)
+            eval_metric="logloss", verbosity=0,
+        )
         xgb.fit(X_tr, y_tr)
-        yp2 = xgb.predict(X_te)
-        f12 = f1_score(y_te, yp2, average="weighted")
-        ac2 = accuracy_score(y_te, yp2)
-        cv2 = cross_val_score(xgb, X, y, cv=5, scoring="f1_weighted")
-        print(f"     Accuracy : {ac2:.4f} | F1 : {f12:.4f} | CV : {cv2.mean():.4f}±{cv2.std():.4f}")
-        resultats["XGB_Classifier"] = {"model":xgb,"f1":f12,"accuracy":ac2,"cv_mean":cv2.mean(),"y_pred":yp2}
+        yp_xgb = xgb.predict(X_te)
+        f1_xgb = f1_score(y_te, yp_xgb, average="weighted")
+        ac_xgb = accuracy_score(y_te, yp_xgb)
+        cv_xgb = cross_val_score(xgb, X, y, cv=tscv, scoring="f1_weighted")
+        print(f"   Accuracy : {ac_xgb:.4f} | F1 : {f1_xgb:.4f} "
+              f"| CV-TS : {cv_xgb.mean():.4f}±{cv_xgb.std():.4f}")
+        resultats["XGB_Classifier"] = {
+            "model": xgb, "f1": f1_xgb, "accuracy": ac_xgb,
+            "cv_mean": cv_xgb.mean(), "y_pred": yp_xgb,
+        }
 
     best_nom = max(resultats, key=lambda k: resultats[k]["f1"])
     best     = resultats[best_nom]
@@ -146,54 +185,65 @@ def entrainer_classification(df):
     joblib.dump(best["model"], chemin)
     print(f"   Sauvegardé → {chemin}")
 
-    sauver_importance(best["model"], FEATURES, "importance_classification.png",
-                      "Classification — OUI/NON Irriguer")
-    sauver_confusion(y_te, best["y_pred"], best_nom)
+    _sauver_importance(best["model"], FEATURES, "importance_classification.png",
+                       "Classification — OUI/NON Irriguer")
+    _sauver_confusion(y_te, best["y_pred"], best_nom)
     return best["model"], X_te, y_te, resultats
 
 
 # ══════════════════════════════════════════════════════════════
 # 3. RÉGRESSION
 # ══════════════════════════════════════════════════════════════
-def entrainer_regression(df):
-    print("\n" + "═"*58)
+
+def entrainer_regression(df: pd.DataFrame,
+                          train: pd.DataFrame,
+                          test: pd.DataFrame) -> tuple:
+    print("\n" + "═" * 60)
     print("  MODÈLE B — RÉGRESSION : Volume d'eau (litres)")
-    print("═"*58)
+    print("═" * 60)
 
-    sub = df[df[TARGET_R] > 0].copy()
-    print(f"  Observations (jours irrigués) : {len(sub)}")
+    # Sous-ensemble : jours irrigués uniquement
+    sub_tr = train[train[TARGET_REG] > 0].copy()
+    sub_te = test[test[TARGET_REG] > 0].copy()
+    sub_all = df[df[TARGET_REG] > 0].copy()
 
-    X = sub[FEATURES]; y = sub[TARGET_R]
-    X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.20, random_state=42)
+    print(f"  Train irrigué : {len(sub_tr)} jours | Test irrigué : {len(sub_te)} jours")
 
+    X_tr = sub_tr[FEATURES];  y_tr = sub_tr[TARGET_REG]
+    X_te = sub_te[FEATURES];  y_te = sub_te[TARGET_REG]
+    X    = sub_all[FEATURES]; y    = sub_all[TARGET_REG]
+
+    tscv = TimeSeriesSplit(n_splits=5)
     resultats = {}
 
     # ── Random Forest ──────────────────────────────────────
     print("\n  [1/2] Random Forest Regressor...")
     rf = RandomForestRegressor(
         n_estimators=300, max_depth=14, min_samples_leaf=2,
-        random_state=42, n_jobs=-1)
+        random_state=42, n_jobs=-1,
+    )
     rf.fit(X_tr, y_tr)
-    yp  = rf.predict(X_te)
-    mae = mean_absolute_error(y_te, yp)
-    r2  = r2_score(y_te, yp)
-    rmse= np.sqrt(mean_squared_error(y_te, yp))
-    print(f"     MAE={mae:.1f}L | RMSE={rmse:.1f}L | R²={r2:.4f}")
-    resultats["RF_Regressor"] = {"model":rf,"mae":mae,"r2":r2,"y_pred":yp}
+    yp    = rf.predict(X_te)
+    mae   = mean_absolute_error(y_te, yp)
+    r2    = r2_score(y_te, yp)
+    rmse  = np.sqrt(mean_squared_error(y_te, yp))
+    print(f"   MAE={mae:.1f}L | RMSE={rmse:.1f}L | R²={r2:.4f}")
+    resultats["RF_Regressor"] = {"model": rf, "mae": mae, "r2": r2, "y_pred": yp}
 
     # ── XGBoost ────────────────────────────────────────────
     if XGBOOST_OK:
         print("\n  [2/2] XGBoost Regressor...")
         xgb = XGBRegressor(
             n_estimators=300, max_depth=6, learning_rate=0.05,
-            random_state=42, verbosity=0)
+            random_state=42, verbosity=0,
+        )
         xgb.fit(X_tr, y_tr)
-        yp2  = xgb.predict(X_te)
-        mae2 = mean_absolute_error(y_te, yp2)
-        r22  = r2_score(y_te, yp2)
-        rmse2= np.sqrt(mean_squared_error(y_te, yp2))
-        print(f"     MAE={mae2:.1f}L | RMSE={rmse2:.1f}L | R²={r22:.4f}")
-        resultats["XGB_Regressor"] = {"model":xgb,"mae":mae2,"r2":r22,"y_pred":yp2}
+        yp2   = xgb.predict(X_te)
+        mae2  = mean_absolute_error(y_te, yp2)
+        r22   = r2_score(y_te, yp2)
+        rmse2 = np.sqrt(mean_squared_error(y_te, yp2))
+        print(f"   MAE={mae2:.1f}L | RMSE={rmse2:.1f}L | R²={r22:.4f}")
+        resultats["XGB_Regressor"] = {"model": xgb, "mae": mae2, "r2": r22, "y_pred": yp2}
 
     best_nom = max(resultats, key=lambda k: resultats[k]["r2"])
     best     = resultats[best_nom]
@@ -203,20 +253,21 @@ def entrainer_regression(df):
     joblib.dump(best["model"], chemin)
     print(f"   Sauvegardé → {chemin}")
 
-    sauver_importance(best["model"], FEATURES, "importance_regression.png",
-                      "Régression — Volume (litres)")
-    sauver_pred_reel(y_te, best["y_pred"], best_nom)
+    _sauver_importance(best["model"], FEATURES, "importance_regression.png",
+                       "Régression — Volume (litres)")
+    _sauver_pred_reel(y_te, best["y_pred"], best_nom)
     return best["model"], resultats
 
 
 # ══════════════════════════════════════════════════════════════
 # 4. VISUALISATIONS
 # ══════════════════════════════════════════════════════════════
-def sauver_importance(model, features, nom, titre):
-    imp  = model.feature_importances_
-    idx  = np.argsort(imp)
-    cols = [features[i] for i in idx]
-    vals = imp[idx]
+
+def _sauver_importance(model, features: list, nom: str, titre: str):
+    imp    = model.feature_importances_
+    idx    = np.argsort(imp)
+    cols   = [features[i] for i in idx]
+    vals   = imp[idx]
     colors = ["#2E86AB" if v >= 0.05 else "#ADB5BD" for v in vals]
 
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -224,81 +275,98 @@ def sauver_importance(model, features, nom, titre):
     ax.axvline(0.05, color="red", linestyle="--", alpha=0.6, label="Seuil 5%")
     ax.set_title(f"Importance des variables — {titre}", fontweight="bold")
     ax.set_xlabel("Importance")
-    ax.legend(); plt.tight_layout()
-    plt.savefig(os.path.join(OUT_DIR, nom), dpi=150); plt.close()
+    ax.legend()
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUT_DIR, nom), dpi=150)
+    plt.close()
     print(f"   {nom}")
 
 
-def sauver_confusion(y_true, y_pred, nom):
+def _sauver_confusion(y_true, y_pred, nom: str):
     cm  = confusion_matrix(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(5, 4))
     im  = ax.imshow(cm, cmap="Blues")
-    ax.set_xticks([0,1]); ax.set_yticks([0,1])
-    ax.set_xticklabels(["Prédit NON","Prédit OUI"])
-    ax.set_yticklabels(["Réel NON","Réel OUI"])
-    labels = [["VN","FP"],["FN","VP"]]
+    ax.set_xticks([0, 1]); ax.set_yticks([0, 1])
+    ax.set_xticklabels(["Prédit NON", "Prédit OUI"])
+    ax.set_yticklabels(["Réel NON",   "Réel OUI"])
+    labels = [["VN", "FP"], ["FN", "VP"]]
     for i in range(2):
         for j in range(2):
-            c = "white" if cm[i,j] > cm.max()/2 else "black"
-            ax.text(j, i, f"{labels[i][j]}\n{cm[i,j]}", ha="center",
-                    va="center", fontsize=14, fontweight="bold", color=c)
+            c = "white" if cm[i, j] > cm.max() / 2 else "black"
+            ax.text(j, i, f"{labels[i][j]}\n{cm[i, j]}",
+                    ha="center", va="center",
+                    fontsize=14, fontweight="bold", color=c)
     ax.set_title(f"Confusion — {nom}", fontweight="bold")
-    plt.colorbar(im, ax=ax); plt.tight_layout()
+    plt.colorbar(im, ax=ax)
+    plt.tight_layout()
     plt.savefig(os.path.join(OUT_DIR, "matrice_confusion.png"), dpi=150)
-    plt.close(); print("   matrice_confusion.png")
+    plt.close()
+    print("   matrice_confusion.png")
 
 
-def sauver_pred_reel(y_true, y_pred, nom):
+def _sauver_pred_reel(y_true, y_pred, nom: str):
     r2  = r2_score(y_true, y_pred)
     mae = mean_absolute_error(y_true, y_pred)
     fig, ax = plt.subplots(figsize=(6, 6))
     ax.scatter(y_true, y_pred, alpha=0.5, color="#2E86AB", s=25)
     lim = max(y_true.max(), y_pred.max()) * 1.05
-    ax.plot([0,lim],[0,lim],"r--", label="Parfait")
+    ax.plot([0, lim], [0, lim], "r--", label="Parfait")
     ax.text(0.05, 0.92, f"R²={r2:.4f}\nMAE={mae:.0f}L",
             transform=ax.transAxes, fontsize=11,
             bbox=dict(facecolor="white", alpha=0.85))
-    ax.set_xlabel("Réel (L)"); ax.set_ylabel("Prédit (L)")
+    ax.set_xlabel("Réel (L)")
+    ax.set_ylabel("Prédit (L)")
     ax.set_title(f"Prédit vs Réel — {nom}", fontweight="bold")
-    ax.legend(); plt.tight_layout()
+    ax.legend()
+    plt.tight_layout()
     plt.savefig(os.path.join(OUT_DIR, "pred_vs_reel_regression.png"), dpi=150)
-    plt.close(); print("   pred_vs_reel_regression.png")
+    plt.close()
+    print("   pred_vs_reel_regression.png")
 
 
 # ══════════════════════════════════════════════════════════════
 # 5. BILAN FINAL
 # ══════════════════════════════════════════════════════════════
-def bilan(res_c, res_r):
-    print("\n" + "═"*58)
+
+def bilan(res_c: dict, res_r: dict):
+    print("\n" + "═" * 60)
     print("  BILAN FINAL")
-    print("═"*58)
-    print("\n  Classification :")
+    print("═" * 60)
+    print("\n  Classification (évaluation chronologique 2024) :")
     for n, r in res_c.items():
-        print(f"    {n:<25} F1={r['f1']:.4f}  Acc={r['accuracy']:.4f}  CV={r['cv_mean']:.4f}")
+        print(f"    {n:<25} F1={r['f1']:.4f}  "
+              f"Acc={r['accuracy']:.4f}  CV-TS={r['cv_mean']:.4f}")
     print("\n  Régression :")
     for n, r in res_r.items():
         print(f"    {n:<25} R²={r['r2']:.4f}  MAE={r['mae']:.1f}L")
 
-    with open(os.path.join(OUT_DIR, "rapport_entrainement.txt"), "w") as f:
-        f.write("RAPPORT ENTRAÎNEMENT — IRRIGATION CI (2022-2024)\n")
-        f.write("="*50 + "\nCLASSIFICATION :\n")
-        for n, r in res_c.items():
-            f.write(f"  {n}: F1={r['f1']:.4f} Acc={r['accuracy']:.4f} CV={r['cv_mean']:.4f}\n")
-        f.write("\nRÉGRESSION :\n")
-        for n, r in res_r.items():
-            f.write(f"  {n}: R²={r['r2']:.4f} MAE={r['mae']:.1f}L\n")
+    rapport = (
+        "RAPPORT ENTRAÎNEMENT — IRRIGATION CI (2022-2024)\n"
+        "Split : chronologique 80/20 | CV : TimeSeriesSplit(5)\n"
+        + "=" * 50
+        + "\nCLASSIFICATION :\n"
+    )
+    for n, r in res_c.items():
+        rapport += f"  {n}: F1={r['f1']:.4f} Acc={r['accuracy']:.4f} CV={r['cv_mean']:.4f}\n"
+    rapport += "\nRÉGRESSION :\n"
+    for n, r in res_r.items():
+        rapport += f"  {n}: R²={r['r2']:.4f} MAE={r['mae']:.1f}L\n"
 
-    print("\n  📄 rapport_entrainement.txt")
-    print("═"*58)
+    with open(os.path.join(OUT_DIR, "rapport_entrainement.txt"), "w") as f:
+        f.write(rapport)
+
+    print("\n   rapport_entrainement.txt")
+    print("═" * 60)
     print("   Entraînement terminé → lancez : 03_prediction.py")
-    print("═"*58)
+    print("═" * 60)
 
 
 # ══════════════════════════════════════════════════════════════
 # EXÉCUTION
 # ══════════════════════════════════════════════════════════════
+
 if __name__ == "__main__":
-    df = charger()
-    clf, X_te, y_te, res_c = entrainer_classification(df)
-    reg, res_r              = entrainer_regression(df)
+    df, train, test = charger_et_splitter()
+    clf, X_te, y_te, res_c = entrainer_classification(df, train, test)
+    reg, res_r              = entrainer_regression(df, train, test)
     bilan(res_c, res_r)
