@@ -1,2 +1,0 @@
-timestamp,date,mode,irriguer,volume_L,source,stade,kc,humidite_sol,ET0_mm,pluie_mm,deficit_mm
-2026-03-06 14:12,2026-03-06,sim,1,1412.2,Modèle ML (RF 2022-2024),mi_saison,1.2,38.0,5.0,0.0,6.0

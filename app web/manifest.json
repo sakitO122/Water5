@@ -1,0 +1,26 @@
+{
+  "name": "Water5 — Irrigation Intelligente",
+  "short_name": "Water5",
+  "description": "Systeme d'irrigation intelligente par IA — Yamoussoukro, Cote d'Ivoire",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0D1F16",
+  "theme_color": "#0D1F16",
+  "orientation": "portrait",
+  "lang": "fr",
+  "icons": [
+    {
+      "src": "icons/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

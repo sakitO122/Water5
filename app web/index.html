@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0D1F16">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Water5">
+  <link rel="manifest" href="manifest.json">
+  <title>Water5</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ECRAN 1 : SPLASH -->
+  <div id="screen-splash" class="screen active">
+    <div class="splash-bg-glow"></div>
+    <div class="splash-content">
+      <div class="splash-logo-wrap">
+        <div class="splash-logo-circle">
+          <span class="splash-logo-letter">W</span>
+        </div>
+        <h1 class="splash-title">Water<span>5</span></h1>
+        <p class="splash-subtitle">Irrigation intelligente par IA<br>Yamoussoukro · Cote d'Ivoire</p>
+      </div>
+      <div class="splash-divider"></div>
+      <div class="splash-stats">
+        <div class="splash-stat">
+          <div class="splash-stat-val">200m²</div>
+          <div class="splash-stat-lbl">Parcelle</div>
+        </div>
+        <div class="splash-stat-sep"></div>
+        <div class="splash-stat">
+          <div class="splash-stat-val">100%</div>
+          <div class="splash-stat-lbl">Precision</div>
+        </div>
+        <div class="splash-stat-sep"></div>
+        <div class="splash-stat">
+          <div class="splash-stat-val">1096j</div>
+          <div class="splash-stat-lbl">Donnees</div>
+        </div>
+      </div>
+      <button class="splash-btn" onclick="goToDashboard()">Commencer</button>
+    </div>
+  </div>
+
+  <!-- ECRAN 2 : DASHBOARD -->
+  <div id="screen-dashboard" class="screen">
+    <div class="dash-header">
+      <div>
+        <div class="dash-greeting">Bonjour,</div>
+        <div class="dash-name">M. Koffi</div>
+      </div>
+      <div class="dash-header-right">
+        <div class="api-indicator" id="api-indicator" title="Statut API">
+          <div class="api-dot" id="api-dot"></div>
+          <span id="api-label">...</span>
+        </div>
+        <div class="dash-avatar-wrap" onclick="goToAlerts()">
+          <div class="dash-avatar">MK</div>
+          <div class="notif-badge" id="notif-badge"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dash-scroll">
+
+      <div class="analyze-btn-wrap">
+        <button class="analyze-btn" id="analyze-btn" onclick="lancerAnalyse()">
+          Analyser mon champ
+        </button>
+      </div>
+
+      <!-- Carte decision -->
+      <div class="decision-card" id="decision-card">
+        <div class="dec-top">
+          <div class="dec-label">Decision du jour</div>
+          <div class="dec-confidence" id="dec-confidence">--</div>
+        </div>
+        <div class="dec-status">
+          <div class="dec-icon-wrap" id="dec-icon-wrap">
+            <span id="dec-icon">?</span>
+          </div>
+          <div class="dec-info">
+            <div class="dec-text" id="dec-text">En attente d'analyse</div>
+            <div class="dec-vol" id="dec-vol">Appuyez sur Analyser</div>
+          </div>
+        </div>
+        <div class="dec-chips" id="dec-chips">
+          <div class="dec-chip">Deficit --</div>
+          <div class="dec-chip">-- C</div>
+          <div class="dec-chip">Mi-saison</div>
+        </div>
+      </div>
+
+      <!-- Metriques -->
+      <div class="sect-title">Capteurs et Meteo</div>
+      <div class="metrics-row">
+        <div class="metric-card">
+          <div class="metric-lbl">Sol</div>
+          <div class="metric-val" id="m-sol">--%</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-lbl">Temp max</div>
+          <div class="metric-val" id="m-temp">--°</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-lbl">Vent u2</div>
+          <div class="metric-val" id="m-vent">--</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-lbl">Pluie</div>
+          <div class="metric-val" id="m-pluie">--mm</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-lbl">ET0 mm</div>
+          <div class="metric-val" id="m-et0">--</div>
+        </div>
+      </div>
+
+      <!-- Jauge sol -->
+      <div class="sect-title">Humidite du sol</div>
+      <div class="soil-gauge-card">
+        <div class="gauge-header">
+          <div class="gauge-title">Open-Meteo</div>
+          <div class="gauge-val" id="gauge-val">--%</div>
+        </div>
+        <div class="gauge-track">
+          <div class="gauge-fill" id="gauge-fill" style="width:0%"></div>
+          <div class="gauge-threshold" style="left:65%"></div>
+        </div>
+        <div class="gauge-labels">
+          <span>Sec (10%)</span>
+          <span>Seuil 65%</span>
+          <span>Humide (90%)</span>
+        </div>
+      </div>
+
+      <!-- Previsions -->
+      <div class="sect-title">Previsions 4 jours</div>
+      <div class="forecast-strip" id="forecast-strip">
+        <div class="forecast-placeholder">Lancez une analyse pour voir les previsions</div>
+      </div>
+
+      <div style="height:80px"></div>
+    </div>
+
+    <nav class="bottom-nav">
+      <div class="nav-item active" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
+      <div class="nav-item" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
+      <div class="nav-item" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
+      <div class="nav-item" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+    </nav>
+  </div>
+
+  <!-- ECRAN 3 : HISTORIQUE -->
+  <div id="screen-history" class="screen">
+    <div class="dash-header">
+      <div class="page-title">Historique</div>
+      <div class="filter-btn" id="filter-label">Ce mois</div>
+    </div>
+    <div class="dash-scroll">
+      <div class="stats-row">
+        <div class="stat-mini">
+          <div class="stat-mini-val green" id="stat-irrig">0</div>
+          <div class="stat-mini-lbl">Irrigations</div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-val orange" id="stat-litres">0</div>
+          <div class="stat-mini-lbl">Litres total</div>
+        </div>
+        <div class="stat-mini">
+          <div class="stat-mini-val blue" id="stat-precision">--</div>
+          <div class="stat-mini-lbl">Precision ML</div>
+        </div>
+      </div>
+      <div class="hist-list" id="hist-list">
+        <div class="hist-empty">Aucune analyse effectuee.<br>Lancez votre premiere analyse depuis l'accueil.</div>
+      </div>
+      <div style="height:80px"></div>
+    </div>
+    <nav class="bottom-nav">
+      <div class="nav-item" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
+      <div class="nav-item active" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
+      <div class="nav-item" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
+      <div class="nav-item" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+    </nav>
+  </div>
+
+  <!-- ECRAN 4 : ALERTES -->
+  <div id="screen-alerts" class="screen">
+    <div class="dash-header">
+      <div class="page-title">Alertes</div>
+      <div class="alerts-badge" id="alerts-count">0</div>
+    </div>
+    <div class="dash-scroll">
+
+      <div class="toggle-card">
+        <div class="toggle-info">
+          <div class="toggle-title">Notification quotidienne</div>
+          <div class="toggle-sub">6h00 chaque matin</div>
+        </div>
+        <div class="toggle" id="notif-toggle" onclick="toggleNotifications()"></div>
+      </div>
+
+      <div class="sect-title">Derniere analyse</div>
+      <div class="sms-preview-box" id="sms-preview">
+        <div class="hist-empty">Aucune analyse effectuee.</div>
+      </div>
+
+      <div class="sect-title">Notifications</div>
+      <div class="alerts-list" id="alerts-list">
+        <div class="hist-empty">Aucune notification.</div>
+      </div>
+      <div style="height:80px"></div>
+    </div>
+    <nav class="bottom-nav">
+      <div class="nav-item" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
+      <div class="nav-item" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
+      <div class="nav-item active" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
+      <div class="nav-item" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+    </nav>
+  </div>
+
+  <!-- ECRAN 5 : REGLAGES -->
+  <div id="screen-settings" class="screen">
+    <div class="dash-header">
+      <div class="page-title">Reglages</div>
+    </div>
+    <div class="dash-scroll">
+
+      <div class="settings-section">
+        <div class="settings-title">Parcelle</div>
+        <div class="settings-item"><span class="settings-lbl">Agriculteur</span><span class="settings-val">M. Koffi</span></div>
+        <div class="settings-item"><span class="settings-lbl">Localisation</span><span class="settings-val">Yamoussoukro, CI</span></div>
+        <div class="settings-item"><span class="settings-lbl">Surface</span><span class="settings-val">200 m2</span></div>
+        <div class="settings-item"><span class="settings-lbl">Culture</span><span class="settings-val">Tomate</span></div>
+        <div class="settings-item"><span class="settings-lbl">Stade</span><span class="settings-val">Mi-saison (Kc 1.05)</span></div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Systeme</div>
+        <div class="settings-item"><span class="settings-lbl">API Meteo</span><span class="settings-val green">Open-Meteo</span></div>
+        <div class="settings-item"><span class="settings-lbl">Modele IA</span><span class="settings-val" id="api-status">Verification...</span></div>
+        <div class="settings-item"><span class="settings-lbl">Serveur API</span><span class="settings-val">localhost:8000</span></div>
+        <div class="settings-item"><span class="settings-lbl">Version</span><span class="settings-val">Water5 v2.0</span></div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-title">Donnees</div>
+        <div class="settings-item"><span class="settings-lbl">Dataset</span><span class="settings-val">2022-2024 (1096j)</span></div>
+        <div class="settings-item"><span class="settings-lbl">Precision</span><span class="settings-val green">100%</span></div>
+        <div class="settings-item"><span class="settings-lbl">R2 regression</span><span class="settings-val green">0.9954</span></div>
+      </div>
+
+      <button class="reset-btn" onclick="resetData()">Effacer toutes les donnees</button>
+      <div style="height:80px"></div>
+    </div>
+    <nav class="bottom-nav">
+      <div class="nav-item" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
+      <div class="nav-item" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
+      <div class="nav-item" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
+      <div class="nav-item active" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+    </nav>
+  </div>
+
+  <!-- OVERLAY CHARGEMENT -->
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="loading-box">
+      <div class="spinner"></div>
+      <div class="loading-title">Analyse en cours...</div>
+      <div class="loading-steps">
+        <div class="loading-step" id="step1">Connexion a Open-Meteo</div>
+        <div class="loading-step" id="step2">Recuperation meteo Yamoussoukro</div>
+        <div class="loading-step" id="step3">Calcul FAO-56 + decision ML</div>
+        <div class="loading-step" id="step4">Sauvegarde des resultats</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

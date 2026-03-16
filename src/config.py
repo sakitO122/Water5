@@ -1,19 +1,13 @@
 """
-=============================================================
- SYSTÈME D'IRRIGATION INTELLIGENTE — CÔTE D'IVOIRE
- config.py : Constantes et configuration centralisées
-=============================================================
- Toute modification de paramètre se fait ICI uniquement.
- Importé par tous les autres modules.
-=============================================================
+config.py
+Configuration centralisee du systeme Water5.
+Toute modification de parametre se fait uniquement dans ce fichier.
 """
 
 import os
 import math
 
-# ══════════════════════════════════════════════════════════════
-# CHEMINS
-# ══════════════════════════════════════════════════════════════
+# ── Chemins ───────────────────────────────────────────────────────────────
 BASE_DIR  = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR  = os.path.join(BASE_DIR, "data")
 MODEL_DIR = os.path.join(BASE_DIR, "models")
@@ -28,65 +22,48 @@ CSV_CLEAN = os.path.join(DATA_DIR, "yamoussoukro_dataset_ML.csv")
 CLF_PATH  = os.path.join(MODEL_DIR, "modele_classification.joblib")
 REG_PATH  = os.path.join(MODEL_DIR, "modele_regression.joblib")
 
-# ══════════════════════════════════════════════════════════════
-# SITE — YAMOUSSOUKRO
-# ══════════════════════════════════════════════════════════════
+# ── Site : Yamoussoukro ───────────────────────────────────────────────────
 LATITUDE_DEG  = 6.8205
 LONGITUDE_DEG = -5.2767
 ALTITUDE_M    = 212.0
 TIMEZONE      = "Africa/Abidjan"
 LATITUDE_RAD  = math.radians(LATITUDE_DEG)
 
-# ══════════════════════════════════════════════════════════════
-# CULTURE — TOMATE (Solanum lycopersicum)
-# ══════════════════════════════════════════════════════════════
-SURFACE_M2 = 200        # Surface de la parcelle de M. Koffi
-EFFICACITE = 0.90       # Efficacité du système goutte-à-goutte
-ALBEDO     = 0.23       # Albédo gazon de référence FAO-56
+# ── Culture : Tomate (Solanum lycopersicum) ───────────────────────────────
+SURFACE_M2        = 200
+EFFICACITE        = 0.90    # efficacite systeme goutte-a-goutte
+ALBEDO            = 0.23    # albedo gazon de reference FAO-56
+HAUTEUR_CULTURE_M = 0.8     # hauteur tomate en mi-saison (m)
 
-# ── Stades phénologiques FAO-56 (durées médianes en jours) ──
+# Stades phenologiques FAO-56 (durees medianes en jours depuis plantation)
 STADES_JOURS = {
-    "initial"    : (0,  25),   # Jeunes plants
-    "croissance" : (25, 60),   # Développement végétatif
-    "mi_saison"  : (60, 110),  # Floraison / fructification
-    "fin_saison" : (110, 135), # Maturation / sénescence
+    "initial"    : (0,   25),
+    "croissance" : (25,  60),
+    "mi_saison"  : (60,  110),
+    "fin_saison" : (110, 135),
 }
 
-# ── Kc FAO-56 base (Tableau 12, Allen et al. 1998) ──────────
+# Kc de base FAO-56 (Tableau 12, Allen et al. 1998)
 KC_FAO_BASE = {
     "initial"    : 0.45,
     "mi_saison"  : 1.15,
     "fin_saison" : 0.80,
-    # "croissance" : interpolé linéairement entre initial et mi_saison
+    # "croissance" : interpole lineairement entre initial et mi_saison
 }
 
-# Hauteur culture tomate en mi-saison (pour correction FAO-56 éq. 62)
-HAUTEUR_CULTURE_M = 0.8
-
-# ══════════════════════════════════════════════════════════════
-# PHYSIQUE — FAO-56
-# ══════════════════════════════════════════════════════════════
-# Constante de Stefan-Boltzmann (MJ m⁻² j⁻¹ K⁻⁴)
-SIGMA = 4.903e-9
-
-# Pression atmosphérique à ALTITUDE_M (FAO-56 éq. 7)
+# ── Physique FAO-56 ───────────────────────────────────────────────────────
+SIGMA        = 4.903e-9   # Stefan-Boltzmann (MJ m-2 j-1 K-4)
 PRESSION_KPA = 101.3 * ((293.0 - 0.0065 * ALTITUDE_M) / 293.0) ** 5.26
+GAMMA        = 0.000665 * PRESSION_KPA   # constante psychrometrique (kPa/C)
 
-# Constante psychrométrique γ à ALTITUDE_M (FAO-56 éq. 8)
-GAMMA = 0.000665 * PRESSION_KPA   # ≈ 0.06571 kPa/°C à 212m
+# ── Seuils agronomiques ───────────────────────────────────────────────────
+SOL_HUMIDE_SEUIL    = 70.0   # % humidite sol : pas d'irrigation au-dessus
+SOL_MOYEN_SEUIL     = 50.0   # % : combine avec pluie moderee
+PLUIE_FORTE_SEUIL   = 10.0   # mm : forte pluie, irrigation annulee
+PLUIE_MODERE_SEUIL  =  5.0   # mm : pluie moderee (combinee avec sol)
+PLUIE_EFFECTIVE_PCT = 0.80   # 80% des precipitations sont utiles (FAO)
 
-# ══════════════════════════════════════════════════════════════
-# RÈGLES AGRONOMIQUES (seuils de décision)
-# ══════════════════════════════════════════════════════════════
-SOL_HUMIDE_SEUIL    = 70.0   # % humidité sol — pas d'irrigation si > seuil
-SOL_MOYEN_SEUIL     = 50.0   # % — combiné avec pluie modérée
-PLUIE_FORTE_SEUIL   = 10.0   # mm — forte pluie, pas d'irrigation
-PLUIE_MODERE_SEUIL  =  5.0   # mm — pluie modérée (combinée avec sol)
-PLUIE_EFFECTIVE_PCT = 0.80   # 80% des précipitations utiles (FAO)
-
-# ══════════════════════════════════════════════════════════════
-# ML — FEATURES
-# ══════════════════════════════════════════════════════════════
+# ── Features du modele ML ─────────────────────────────────────────────────
 FEATURES = [
     "humidite_sol_moy_pct",
     "humidite_sol_min_pct",
