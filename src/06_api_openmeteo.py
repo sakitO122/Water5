@@ -43,18 +43,22 @@ from agronomie import kc_tomate, get_stade
 # ── API Open-Meteo ────────────────────────────────────────────────────────
 
 def appeler_api() -> tuple:
-    """Recupere les donnees meteo via openmeteo-requests (cache 1h)."""
+    """
+    Recupere les donnees meteo via Open-Meteo — appel direct sans cache.
+    Variables optimisees pour le modele ML Water5 (zone racinaire tomate).
+    """
     try:
         import openmeteo_requests
-        import requests_cache
+        import requests
         from retry_requests import retry
     except ImportError:
         print("Bibliotheques manquantes :")
-        print("  pip install openmeteo-requests requests-cache retry-requests")
+        print("  pip install openmeteo-requests retry-requests requests")
         sys.exit(1)
 
-    cache_session = requests_cache.CachedSession(".cache", expire_after=3600)
-    retry_session = retry(cache_session, retries=5, backoff_factor=0.2)
+    # Sans cache — donnees fraiches a chaque lancement
+    session       = requests.Session()
+    retry_session = retry(session, retries=5, backoff_factor=0.2)
     openmeteo     = openmeteo_requests.Client(session=retry_session)
 
     params = {
@@ -62,21 +66,32 @@ def appeler_api() -> tuple:
         "longitude"     : LONGITUDE_DEG,
         "timezone"      : TIMEZONE,
         "forecast_days" : 4,
+        # Ordre Variables(0..5) fixe — ne pas modifier
         "hourly": [
-            "temperature_2m", "rain", "wind_speed_10m",
-            "soil_temperature_0_to_7cm", "soil_moisture_7_to_28cm",
-            "relative_humidity_2m", "soil_moisture_0_to_7cm",
+            "temperature_2m",          # 0
+            "relative_humidity_2m",    # 1
+            "wind_speed_10m",          # 2
+            "soil_temperature_6cm",    # 3
+            "soil_moisture_9_to_27cm", # 4  zone racinaire tomate
+            "soil_moisture_1_to_3cm",  # 5  couche surface
         ],
+        # Ordre Variables(0..6) fixe — ne pas modifier
         "daily": [
-            "temperature_2m_mean", "temperature_2m_max", "temperature_2m_min",
-            "wind_speed_10m_max", "shortwave_radiation_sum",
-            "et0_fao_evapotranspiration", "precipitation_sum",
+            "temperature_2m_max",         # 0
+            "temperature_2m_min",         # 1
+            "wind_speed_10m_max",         # 2
+            "shortwave_radiation_sum",    # 3
+            "et0_fao_evapotranspiration", # 4
+            "precipitation_sum",          # 5
+            "rain_sum",                   # 6
         ],
     }
 
+    print("  Appel Open-Meteo (sans cache — donnees fraiches)...")
     responses = openmeteo.weather_api("https://api.open-meteo.com/v1/forecast", params=params)
     response  = responses[0]
 
+    # Horaire
     hourly  = response.Hourly()
     dates_h = pd.date_range(
         start     = pd.to_datetime(hourly.Time(),    unit="s", utc=True),
@@ -88,20 +103,18 @@ def appeler_api() -> tuple:
     df_h = pd.DataFrame({
         "datetime"               : dates_h,
         "temp_C"                 : hourly.Variables(0).ValuesAsNumpy(),
-        "pluie_mm"               : hourly.Variables(1).ValuesAsNumpy(),
+        "humidite_air_pct"       : hourly.Variables(1).ValuesAsNumpy(),
         "vent_10m_kmh"           : hourly.Variables(2).ValuesAsNumpy(),
-        "temp_sol_0_7cm"         : hourly.Variables(3).ValuesAsNumpy(),
-        "humidite_sol_7_28cm_m3" : hourly.Variables(4).ValuesAsNumpy(),
-        "humidite_air_pct"       : hourly.Variables(5).ValuesAsNumpy(),
-        "humidite_sol_0_7cm_m3"  : hourly.Variables(6).ValuesAsNumpy(),
+        "temp_sol_6cm"           : hourly.Variables(3).ValuesAsNumpy(),
+        "humidite_sol_9_27cm_m3" : hourly.Variables(4).ValuesAsNumpy(),
+        "humidite_sol_1_3cm_m3"  : hourly.Variables(5).ValuesAsNumpy(),
     })
-
-    # Conversion m3/m3 -> % avec gestion NaN
-    # Open-Meteo peut renvoyer NaN sur les heures futures
-    df_h["humidite_sol_7_28cm_pct"] = (df_h["humidite_sol_7_28cm_m3"] * 100).round(1)
-    df_h["humidite_sol_0_7cm_pct"]  = (df_h["humidite_sol_0_7cm_m3"]  * 100).round(1)
+    # Conservation des noms attendus par construire_features
+    df_h["humidite_sol_7_28cm_pct"] = (df_h["humidite_sol_9_27cm_m3"] * 100).round(1)
+    df_h["humidite_sol_0_7cm_pct"]  = (df_h["humidite_sol_1_3cm_m3"]  * 100).round(1)
     df_h["date_only"] = pd.to_datetime(df_h["datetime"]).dt.date
 
+    # Quotidien
     daily   = response.Daily()
     dates_d = pd.date_range(
         start     = pd.to_datetime(daily.Time(),    unit="s", utc=True),
@@ -112,14 +125,16 @@ def appeler_api() -> tuple:
 
     df_q = pd.DataFrame({
         "date"              : dates_d.date,
-        "temp_moy_C"        : daily.Variables(0).ValuesAsNumpy(),
-        "temp_max_C"        : daily.Variables(1).ValuesAsNumpy(),
-        "temp_min_C"        : daily.Variables(2).ValuesAsNumpy(),
-        "vent_max_kmh"      : daily.Variables(3).ValuesAsNumpy(),
-        "rayonnement_Rs_MJ" : daily.Variables(4).ValuesAsNumpy(),
-        "ET0_reference_mm"  : daily.Variables(5).ValuesAsNumpy(),
-        "pluie_totale_mm"   : daily.Variables(6).ValuesAsNumpy(),
+        "temp_max_C"        : daily.Variables(0).ValuesAsNumpy(),
+        "temp_min_C"        : daily.Variables(1).ValuesAsNumpy(),
+        "vent_max_kmh"      : daily.Variables(2).ValuesAsNumpy(),
+        "rayonnement_Rs_MJ" : daily.Variables(3).ValuesAsNumpy(),
+        "ET0_reference_mm"  : daily.Variables(4).ValuesAsNumpy(),
+        "pluie_totale_mm"   : daily.Variables(5).ValuesAsNumpy(),
+        "pluie_rain_mm"     : daily.Variables(6).ValuesAsNumpy(),
     })
+    # temp_moy_C calcule depuis max et min
+    df_q["temp_moy_C"] = ((df_q["temp_max_C"] + df_q["temp_min_C"]) / 2).round(1)
 
     print(f"  API OK : {len(df_h)} heures | {len(df_q)} jours")
     return df_h, df_q
@@ -173,18 +188,6 @@ def _get_saison(mois: int) -> str:
     return "petite_pluie"
 
 
-def _nan_safe(valeur: float, defaut: float) -> float:
-    """Retourne defaut si valeur est NaN ou infini."""
-    if valeur is None:
-        return defaut
-    try:
-        if math.isnan(valeur) or math.isinf(valeur):
-            return defaut
-    except (TypeError, ValueError):
-        return defaut
-    return valeur
-
-
 def construire_features(
     df_h             : pd.DataFrame,
     df_q             : pd.DataFrame,
@@ -197,8 +200,7 @@ def construire_features(
     d_dt   = pd.to_datetime(str(date_j))
     df_jour = df_h[df_h["date_only"] == date_j]
 
-    # Valeur de repli si Open-Meteo ne fournit pas l'humidite sol
-    # (frequent sur les jours J+1 a J+3 en prevision)
+    # Valeur de repli si Open-Meteo ne fournit pas l'humidite sol (frequent en prevision)
     HS_DEFAUT = 40.0
 
     if len(df_jour) == 0:
@@ -213,22 +215,23 @@ def construire_features(
     else:
         hs_raw       = df_jour["humidite_sol_7_28cm_pct"].dropna()
         hs_moy       = float(hs_raw.mean()) if len(hs_raw) > 0 else HS_DEFAUT
-        hs_min       = float(hs_raw.min())  if len(hs_raw) > 0 else HS_DEFAUT - 5.0
+        hs_min_raw   = float(hs_raw.min())  if len(hs_raw) > 0 else HS_DEFAUT - 5.0
         hs_07_raw    = df_jour["humidite_sol_0_7cm_pct"].dropna()
+        hs_min       = hs_min_raw
         hs_07        = float(hs_07_raw.mean()) if len(hs_07_raw) > 0 else max(10.0, hs_moy - 2.0)
         ha_moy       = float(df_jour["humidite_air_pct"].mean())
         ha_max       = float(df_jour["humidite_air_pct"].max())
         ha_min       = float(df_jour["humidite_air_pct"].min())
         vent_moy_kmh = float(df_jour["vent_10m_kmh"].mean())
 
-    # Protection finale contre les NaN residuels
-    hs_moy = max(5.0, min(100.0, _nan_safe(hs_moy, HS_DEFAUT)))
-    hs_min = max(5.0, min(100.0, _nan_safe(hs_min, HS_DEFAUT - 5.0)))
-    hs_07  = max(5.0, min(100.0, _nan_safe(hs_07,  HS_DEFAUT - 2.0)))
-    ha_moy = _nan_safe(ha_moy, 60.0)
-    ha_max = _nan_safe(ha_max, 80.0)
-    ha_min = _nan_safe(ha_min, 40.0)
-    vent_moy_kmh = _nan_safe(vent_moy_kmh, 7.2)
+    # S'assurer qu'aucune valeur n'est NaN apres traitement
+    import math
+    if math.isnan(hs_moy): hs_moy = HS_DEFAUT
+    if math.isnan(hs_min): hs_min = HS_DEFAUT - 5.0
+    if math.isnan(hs_07):  hs_07  = HS_DEFAUT - 2.0
+    hs_moy = max(5.0, min(100.0, hs_moy))
+    hs_min = max(5.0, min(100.0, hs_min))
+    hs_07  = max(5.0, min(100.0, hs_07))
 
     if humidite_capteur is not None and index_jour == 0:
         hs_moy = humidite_capteur
@@ -242,7 +245,7 @@ def construire_features(
     ETc        = round(ET0 * kc, 2)
     pluie      = float(row_q["pluie_totale_mm"])
     pluie_e    = round(pluie * PLUIE_EFFECTIVE_PCT, 2)
-    deficit    = round(max(ETc - pluie_e, 0.0), 2)
+    deficit    = round(ETc - pluie_e, 2)
     J          = int(d_dt.dayofyear)
 
     return {

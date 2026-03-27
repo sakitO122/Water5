@@ -3,279 +3,312 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0D1F16">
+  <meta name="theme-color" content="#0a1a0f">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Water5">
+  <link rel="apple-touch-icon" href="icons/icon.png">
+  <link rel="icon" type="image/png" href="icons/icon.png">
   <link rel="manifest" href="manifest.json">
   <title>Water5</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <!-- ECRAN 1 : SPLASH -->
+  <!-- ============================================================
+       ECRAN SPLASH
+  ============================================================ -->
   <div id="screen-splash" class="screen active">
-    <div class="splash-bg-glow"></div>
-    <div class="splash-content">
-      <div class="splash-logo-wrap">
-        <div class="splash-logo-circle">
-          <span class="splash-logo-letter">W</span>
-        </div>
-        <h1 class="splash-title">Water<span>5</span></h1>
-        <p class="splash-subtitle">Irrigation intelligente par IA<br>Yamoussoukro · Cote d'Ivoire</p>
+    <div class="splash-inner">
+      <div class="splash-logo">
+        <img src="icons/icon.png" alt="Water5 Logo" class="splash-logo-img">
       </div>
-      <div class="splash-divider"></div>
+      <div class="splash-text">
+        <h1 class="splash-title">Water<span>5</span></h1>
+        <p class="splash-sub">Irrigation intelligente — Yamoussoukro</p>
+      </div>
       <div class="splash-stats">
         <div class="splash-stat">
-          <div class="splash-stat-val">200m²</div>
-          <div class="splash-stat-lbl">Parcelle</div>
+          <div class="splash-stat-n">200m2</div>
+          <div class="splash-stat-l">Parcelle</div>
         </div>
-        <div class="splash-stat-sep"></div>
+        <div class="splash-stat-div"></div>
         <div class="splash-stat">
-          <div class="splash-stat-val">100%</div>
-          <div class="splash-stat-lbl">Precision</div>
+          <div class="splash-stat-n">100%</div>
+          <div class="splash-stat-l">Precision ML</div>
         </div>
-        <div class="splash-stat-sep"></div>
+        <div class="splash-stat-div"></div>
         <div class="splash-stat">
-          <div class="splash-stat-val">1096j</div>
-          <div class="splash-stat-lbl">Donnees</div>
+          <div class="splash-stat-n">1096j</div>
+          <div class="splash-stat-l">Donnees</div>
         </div>
       </div>
-      <button class="splash-btn" onclick="goToDashboard()">Commencer</button>
+      <button class="btn-primary" onclick="goToDashboard()">Demarrer</button>
     </div>
   </div>
 
-  <!-- ECRAN 2 : DASHBOARD -->
-  <div id="screen-dashboard" class="screen">
-    <div class="dash-header">
-      <div>
-        <div class="dash-greeting">Bonjour,</div>
-        <div class="dash-name">M. Koffi</div>
+  <!-- ============================================================
+       ECRAN PRINCIPAL
+  ============================================================ -->
+  <div id="screen-main" class="screen">
+
+    <!-- Header -->
+    <header class="header">
+      <div class="header-left">
+        <div class="header-greeting">Bonjour,</div>
+        <div class="header-name">M. Koffi</div>
       </div>
-      <div class="dash-header-right">
-        <div class="api-indicator" id="api-indicator" title="Statut API">
+      <div class="header-right">
+        <div class="api-pill" id="api-pill">
           <div class="api-dot" id="api-dot"></div>
           <span id="api-label">...</span>
         </div>
-        <div class="dash-avatar-wrap" onclick="goToAlerts()">
-          <div class="dash-avatar">MK</div>
-          <div class="notif-badge" id="notif-badge"></div>
-        </div>
+        <button class="avatar-btn" onclick="showTab('settings')" title="Reglages">
+          <img src="icons/icon.png" alt="W5" style="width:36px;height:36px;border-radius:50%;object-fit:cover;">
+        </button>
       </div>
-    </div>
+    </header>
 
-    <div class="dash-scroll">
+    <!-- Contenu scrollable -->
+    <div class="main-scroll">
 
-      <div class="analyze-btn-wrap">
-        <button class="analyze-btn" id="analyze-btn" onclick="lancerAnalyse()">
+      <!-- Bouton analyser -->
+      <div class="section-pad">
+        <button class="btn-analyze" id="btn-analyze" onclick="lancerAnalyse()">
           Analyser mon champ
         </button>
       </div>
 
       <!-- Carte decision -->
-      <div class="decision-card" id="decision-card">
-        <div class="dec-top">
-          <div class="dec-label">Decision du jour</div>
-          <div class="dec-confidence" id="dec-confidence">--</div>
-        </div>
-        <div class="dec-status">
-          <div class="dec-icon-wrap" id="dec-icon-wrap">
-            <span id="dec-icon">?</span>
+      <div class="section-pad">
+        <div class="card-decision" id="card-decision">
+          <div class="card-decision-top">
+            <span class="card-decision-label">Decision du jour</span>
+            <span class="badge-ml" id="badge-ml">--</span>
           </div>
-          <div class="dec-info">
-            <div class="dec-text" id="dec-text">En attente d'analyse</div>
-            <div class="dec-vol" id="dec-vol">Appuyez sur Analyser</div>
+          <div class="card-decision-body">
+            <div class="decision-icon" id="dec-icon">?</div>
+            <div class="decision-info">
+              <div class="decision-title" id="dec-title">En attente d'analyse</div>
+              <div class="decision-vol" id="dec-vol">Appuyez sur Analyser</div>
+            </div>
           </div>
-        </div>
-        <div class="dec-chips" id="dec-chips">
-          <div class="dec-chip">Deficit --</div>
-          <div class="dec-chip">-- C</div>
-          <div class="dec-chip">Mi-saison</div>
+          <div class="card-decision-chips" id="dec-chips">
+            <span class="chip">Deficit --</span>
+            <span class="chip">-- C</span>
+            <span class="chip">Mi-saison</span>
+          </div>
         </div>
       </div>
 
       <!-- Metriques -->
-      <div class="sect-title">Capteurs et Meteo</div>
-      <div class="metrics-row">
-        <div class="metric-card">
+      <div class="section-label">Capteurs et Meteo</div>
+      <div class="metrics-scroll">
+        <div class="metric-item">
           <div class="metric-lbl">Sol</div>
           <div class="metric-val" id="m-sol">--%</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-item">
           <div class="metric-lbl">Temp max</div>
-          <div class="metric-val" id="m-temp">--°</div>
+          <div class="metric-val" id="m-temp">--</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-item">
           <div class="metric-lbl">Vent u2</div>
           <div class="metric-val" id="m-vent">--</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-item">
           <div class="metric-lbl">Pluie</div>
-          <div class="metric-val" id="m-pluie">--mm</div>
+          <div class="metric-val" id="m-pluie">--</div>
         </div>
-        <div class="metric-card">
+        <div class="metric-item">
           <div class="metric-lbl">ET0 mm</div>
           <div class="metric-val" id="m-et0">--</div>
+        </div>
+        <div class="metric-item">
+          <div class="metric-lbl">ETc mm</div>
+          <div class="metric-val" id="m-etc">--</div>
         </div>
       </div>
 
       <!-- Jauge sol -->
-      <div class="sect-title">Humidite du sol</div>
-      <div class="soil-gauge-card">
-        <div class="gauge-header">
-          <div class="gauge-title">Open-Meteo</div>
-          <div class="gauge-val" id="gauge-val">--%</div>
-        </div>
-        <div class="gauge-track">
-          <div class="gauge-fill" id="gauge-fill" style="width:0%"></div>
-          <div class="gauge-threshold" style="left:65%"></div>
-        </div>
-        <div class="gauge-labels">
-          <span>Sec (10%)</span>
-          <span>Seuil 65%</span>
-          <span>Humide (90%)</span>
+      <div class="section-label">Humidite du sol</div>
+      <div class="section-pad">
+        <div class="card">
+          <div class="gauge-header">
+            <span class="gauge-source" id="gauge-source">Open-Meteo (serveur)</span>
+            <span class="gauge-pct" id="gauge-pct">--%</span>
+          </div>
+          <div class="gauge-track">
+            <div class="gauge-bar" id="gauge-bar" style="width:0%"></div>
+            <div class="gauge-marker"></div>
+          </div>
+          <div class="gauge-labels">
+            <span>Sec (10%)</span>
+            <span>Seuil 65%</span>
+            <span>Humide (90%)</span>
+          </div>
+          <div class="gauge-detail" id="gauge-detail">
+            Deficit : -- mm &nbsp;|&nbsp; Kc : -- &nbsp;|&nbsp; Stade : --
+          </div>
         </div>
       </div>
 
       <!-- Previsions -->
-      <div class="sect-title">Previsions 4 jours</div>
-      <div class="forecast-strip" id="forecast-strip">
-        <div class="forecast-placeholder">Lancez une analyse pour voir les previsions</div>
+      <div class="section-label">Previsions 4 jours</div>
+      <div class="forecast-scroll" id="forecast-strip">
+        <div class="forecast-empty">Lancez une analyse pour voir les previsions</div>
       </div>
 
       <div style="height:80px"></div>
     </div>
 
+    <!-- Navigation -->
     <nav class="bottom-nav">
-      <div class="nav-item active" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
-      <div class="nav-item" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
-      <div class="nav-item" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
-      <div class="nav-item" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+      <button class="nav-btn active" id="nav-dashboard" onclick="showTab('dashboard')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        <span>Accueil</span>
+      </button>
+      <button class="nav-btn" id="nav-history" onclick="showTab('history')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Historique</span>
+      </button>
+      <button class="nav-btn" id="nav-alerts" onclick="showTab('alerts')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        <span>Alertes</span>
+      </button>
+      <button class="nav-btn" id="nav-settings" onclick="showTab('settings')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Reglages</span>
+      </button>
     </nav>
   </div>
 
-  <!-- ECRAN 3 : HISTORIQUE -->
+  <!-- ============================================================
+       ECRAN HISTORIQUE
+  ============================================================ -->
   <div id="screen-history" class="screen">
-    <div class="dash-header">
-      <div class="page-title">Historique</div>
-      <div class="filter-btn" id="filter-label">Ce mois</div>
-    </div>
-    <div class="dash-scroll">
+    <header class="header">
+      <div class="header-name">Historique</div>
+      <div class="header-month" id="hist-month">--</div>
+    </header>
+    <div class="main-scroll">
       <div class="stats-row">
-        <div class="stat-mini">
-          <div class="stat-mini-val green" id="stat-irrig">0</div>
-          <div class="stat-mini-lbl">Irrigations</div>
+        <div class="stat-box">
+          <div class="stat-n green" id="h-irrig">0</div>
+          <div class="stat-l">Irrigations</div>
         </div>
-        <div class="stat-mini">
-          <div class="stat-mini-val orange" id="stat-litres">0</div>
-          <div class="stat-mini-lbl">Litres total</div>
+        <div class="stat-box">
+          <div class="stat-n amber" id="h-litres">0</div>
+          <div class="stat-l">Litres total</div>
         </div>
-        <div class="stat-mini">
-          <div class="stat-mini-val blue" id="stat-precision">--</div>
-          <div class="stat-mini-lbl">Precision ML</div>
+        <div class="stat-box">
+          <div class="stat-n sky" id="h-prec">--</div>
+          <div class="stat-l">Precision ML</div>
         </div>
       </div>
-      <div class="hist-list" id="hist-list">
-        <div class="hist-empty">Aucune analyse effectuee.<br>Lancez votre premiere analyse depuis l'accueil.</div>
-      </div>
+      <div id="hist-list"><div class="empty-msg">Aucune analyse effectuee.</div></div>
       <div style="height:80px"></div>
     </div>
     <nav class="bottom-nav">
-      <div class="nav-item" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
-      <div class="nav-item active" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
-      <div class="nav-item" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
-      <div class="nav-item" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+      <button class="nav-btn" onclick="showTab('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span>Accueil</span></button>
+      <button class="nav-btn active" onclick="showTab('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Historique</span></button>
+      <button class="nav-btn" onclick="showTab('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span>Alertes</span></button>
+      <button class="nav-btn" onclick="showTab('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Reglages</span></button>
     </nav>
   </div>
 
-  <!-- ECRAN 4 : ALERTES -->
+  <!-- ============================================================
+       ECRAN ALERTES
+  ============================================================ -->
   <div id="screen-alerts" class="screen">
-    <div class="dash-header">
-      <div class="page-title">Alertes</div>
-      <div class="alerts-badge" id="alerts-count">0</div>
-    </div>
-    <div class="dash-scroll">
-
-      <div class="toggle-card">
-        <div class="toggle-info">
-          <div class="toggle-title">Notification quotidienne</div>
-          <div class="toggle-sub">6h00 chaque matin</div>
+    <header class="header">
+      <div class="header-name">Alertes</div>
+      <div class="alerts-count-badge" id="alerts-badge">0</div>
+    </header>
+    <div class="main-scroll">
+      <div class="section-pad">
+        <div class="card toggle-card">
+          <div class="toggle-info">
+            <div class="toggle-title">Notification quotidienne</div>
+            <div class="toggle-sub">6h00 chaque matin</div>
+          </div>
+          <button class="toggle-btn" id="notif-toggle" onclick="toggleNotif()"></button>
         </div>
-        <div class="toggle" id="notif-toggle" onclick="toggleNotifications()"></div>
       </div>
-
-      <div class="sect-title">Derniere analyse</div>
-      <div class="sms-preview-box" id="sms-preview">
-        <div class="hist-empty">Aucune analyse effectuee.</div>
+      <div class="section-label">Derniere analyse</div>
+      <div class="section-pad">
+        <div class="card sms-card" id="sms-preview">
+          <div class="sms-empty">Aucune analyse effectuee.</div>
+        </div>
       </div>
-
-      <div class="sect-title">Notifications</div>
-      <div class="alerts-list" id="alerts-list">
-        <div class="hist-empty">Aucune notification.</div>
+      <div class="section-label">Notifications</div>
+      <div id="alerts-list" class="section-pad">
+        <div class="empty-msg">Aucune notification.</div>
       </div>
       <div style="height:80px"></div>
     </div>
     <nav class="bottom-nav">
-      <div class="nav-item" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
-      <div class="nav-item" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
-      <div class="nav-item active" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
-      <div class="nav-item" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+      <button class="nav-btn" onclick="showTab('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span>Accueil</span></button>
+      <button class="nav-btn" onclick="showTab('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Historique</span></button>
+      <button class="nav-btn active" onclick="showTab('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span>Alertes</span></button>
+      <button class="nav-btn" onclick="showTab('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Reglages</span></button>
     </nav>
   </div>
 
-  <!-- ECRAN 5 : REGLAGES -->
+  <!-- ============================================================
+       ECRAN REGLAGES
+  ============================================================ -->
   <div id="screen-settings" class="screen">
-    <div class="dash-header">
-      <div class="page-title">Reglages</div>
-    </div>
-    <div class="dash-scroll">
-
-      <div class="settings-section">
-        <div class="settings-title">Parcelle</div>
-        <div class="settings-item"><span class="settings-lbl">Agriculteur</span><span class="settings-val">M. Koffi</span></div>
-        <div class="settings-item"><span class="settings-lbl">Localisation</span><span class="settings-val">Yamoussoukro, CI</span></div>
-        <div class="settings-item"><span class="settings-lbl">Surface</span><span class="settings-val">200 m2</span></div>
-        <div class="settings-item"><span class="settings-lbl">Culture</span><span class="settings-val">Tomate</span></div>
-        <div class="settings-item"><span class="settings-lbl">Stade</span><span class="settings-val">Mi-saison (Kc 1.05)</span></div>
+    <header class="header">
+      <div class="header-name">Reglages</div>
+    </header>
+    <div class="main-scroll">
+      <div class="settings-group">
+        <div class="settings-group-title">Parcelle</div>
+        <div class="settings-row"><span>Agriculteur</span><span>M. Koffi</span></div>
+        <div class="settings-row"><span>Localisation</span><span>Yamoussoukro, CI</span></div>
+        <div class="settings-row"><span>Surface</span><span>200 m2</span></div>
+        <div class="settings-row"><span>Culture</span><span>Tomate</span></div>
+        <div class="settings-row"><span>Stade</span><span>Mi-saison (Kc 1.05)</span></div>
       </div>
-
-      <div class="settings-section">
-        <div class="settings-title">Systeme</div>
-        <div class="settings-item"><span class="settings-lbl">API Meteo</span><span class="settings-val green">Open-Meteo</span></div>
-        <div class="settings-item"><span class="settings-lbl">Modele IA</span><span class="settings-val" id="api-status">Verification...</span></div>
-        <div class="settings-item"><span class="settings-lbl">Serveur API</span><span class="settings-val">localhost:8000</span></div>
-        <div class="settings-item"><span class="settings-lbl">Version</span><span class="settings-val">Water5 v2.0</span></div>
+      <div class="settings-group">
+        <div class="settings-group-title">Systeme</div>
+        <div class="settings-row"><span>API Meteo</span><span class="val-green">Open-Meteo</span></div>
+        <div class="settings-row"><span>Modele IA</span><span id="s-modele" class="val-green">Verification...</span></div>
+        <div class="settings-row"><span>Serveur API</span><span>localhost:8000</span></div>
+        <div class="settings-row"><span>Version</span><span>Water5 v3.0</span></div>
       </div>
-
-      <div class="settings-section">
-        <div class="settings-title">Donnees</div>
-        <div class="settings-item"><span class="settings-lbl">Dataset</span><span class="settings-val">2022-2024 (1096j)</span></div>
-        <div class="settings-item"><span class="settings-lbl">Precision</span><span class="settings-val green">100%</span></div>
-        <div class="settings-item"><span class="settings-lbl">R2 regression</span><span class="settings-val green">0.9954</span></div>
+      <div class="settings-group">
+        <div class="settings-group-title">Performances ML</div>
+        <div class="settings-row"><span>Precision</span><span class="val-green">100%</span></div>
+        <div class="settings-row"><span>R2 regression</span><span class="val-green">0.9954</span></div>
+        <div class="settings-row"><span>Dataset</span><span>2022-2024 (1096j)</span></div>
       </div>
-
-      <button class="reset-btn" onclick="resetData()">Effacer toutes les donnees</button>
+      <div class="section-pad">
+        <button class="btn-danger" onclick="resetData()">Effacer toutes les donnees</button>
+      </div>
       <div style="height:80px"></div>
     </div>
     <nav class="bottom-nav">
-      <div class="nav-item" onclick="showTab('dashboard')"><div class="nav-icon">&#8962;</div><span>Accueil</span></div>
-      <div class="nav-item" onclick="showTab('history')"><div class="nav-icon">&#9783;</div><span>Historique</span></div>
-      <div class="nav-item" onclick="showTab('alerts')"><div class="nav-icon">&#9741;</div><span>Alertes</span></div>
-      <div class="nav-item active" onclick="showTab('settings')"><div class="nav-icon">&#9881;</div><span>Reglages</span></div>
+      <button class="nav-btn" onclick="showTab('dashboard')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span>Accueil</span></button>
+      <button class="nav-btn" onclick="showTab('history')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span>Historique</span></button>
+      <button class="nav-btn" onclick="showTab('alerts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span>Alertes</span></button>
+      <button class="nav-btn active" onclick="showTab('settings')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l-.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>Reglages</span></button>
     </nav>
   </div>
 
-  <!-- OVERLAY CHARGEMENT -->
-  <div id="loading-overlay" class="loading-overlay hidden">
-    <div class="loading-box">
-      <div class="spinner"></div>
-      <div class="loading-title">Analyse en cours...</div>
-      <div class="loading-steps">
-        <div class="loading-step" id="step1">Connexion a Open-Meteo</div>
-        <div class="loading-step" id="step2">Recuperation meteo Yamoussoukro</div>
-        <div class="loading-step" id="step3">Calcul FAO-56 + decision ML</div>
-        <div class="loading-step" id="step4">Sauvegarde des resultats</div>
+  <!-- ============================================================
+       OVERLAY CHARGEMENT
+  ============================================================ -->
+  <div id="overlay" class="overlay hidden">
+    <div class="overlay-box">
+      <div class="loader"></div>
+      <div class="overlay-title">Analyse en cours...</div>
+      <div class="overlay-steps">
+        <div class="step" id="step1">Connexion au serveur</div>
+        <div class="step" id="step2">Recuperation meteo Open-Meteo</div>
+        <div class="step" id="step3">Calcul FAO-56 et Random Forest</div>
+        <div class="step" id="step4">Sauvegarde des resultats</div>
       </div>
     </div>
   </div>

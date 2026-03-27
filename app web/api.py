@@ -188,45 +188,29 @@ def _ml_decision(features_dict, hs, deficit):
 # ── Open-Meteo cote serveur ───────────────────────────────────────────────
 
 def _appeler_open_meteo():
-    """
-    Appelle Open-Meteo sans cache — memes variables que 06_api_openmeteo.py.
-    Synchronise apres mise a jour du 21/03/2026.
-    """
     try:
-        import openmeteo_requests
-        import requests
+        import openmeteo_requests, requests_cache
         from retry_requests import retry
     except ImportError:
-        raise HTTPException(500, "pip install openmeteo-requests retry-requests requests")
+        raise HTTPException(500, "pip install openmeteo-requests requests-cache retry-requests")
 
-    # Sans cache — donnees fraiches a chaque appel /analyser
-    session       = requests.Session()
-    retry_session = retry(session, retries=3, backoff_factor=0.3)
-    client        = openmeteo_requests.Client(session=retry_session)
+    cache_dir = os.path.join(_THIS_DIR, ".cache")
+    session   = retry(requests_cache.CachedSession(cache_dir, expire_after=3600),
+                      retries=3, backoff_factor=0.3)
+    client    = openmeteo_requests.Client(session=session)
 
     params = {
-        "latitude"      : LATITUDE_DEG,
-        "longitude"     : LONGITUDE_DEG,
-        "timezone"      : TIMEZONE,
-        "forecast_days" : 4,
-        # Ordre Variables(0..5) fixe — identique a 06_api_openmeteo.py
+        "latitude": LATITUDE_DEG, "longitude": LONGITUDE_DEG,
+        "timezone": TIMEZONE, "forecast_days": 4,
         "hourly": [
-            "temperature_2m",          # 0
-            "relative_humidity_2m",    # 1
-            "wind_speed_10m",          # 2
-            "soil_temperature_6cm",    # 3
-            "soil_moisture_9_to_27cm", # 4  zone racinaire tomate
-            "soil_moisture_1_to_3cm",  # 5  couche surface
+            "temperature_2m","rain","wind_speed_10m",
+            "soil_temperature_0_to_7cm","soil_moisture_7_to_28cm",
+            "relative_humidity_2m","soil_moisture_0_to_7cm",
         ],
-        # Ordre Variables(0..6) fixe — identique a 06_api_openmeteo.py
         "daily": [
-            "temperature_2m_max",         # 0
-            "temperature_2m_min",         # 1
-            "wind_speed_10m_max",         # 2
-            "shortwave_radiation_sum",    # 3
-            "et0_fao_evapotranspiration", # 4
-            "precipitation_sum",          # 5
-            "rain_sum",                   # 6
+            "temperature_2m_mean","temperature_2m_max","temperature_2m_min",
+            "wind_speed_10m_max","shortwave_radiation_sum",
+            "et0_fao_evapotranspiration","precipitation_sum",
         ],
     }
 
@@ -235,51 +219,44 @@ def _appeler_open_meteo():
     except Exception as e:
         raise HTTPException(503, f"Open-Meteo indisponible : {e}")
 
-    # Horaire
     h = r.Hourly()
     dates_h = pd.date_range(
-        start     = pd.to_datetime(h.Time(),    unit="s", utc=True),
-        end       = pd.to_datetime(h.TimeEnd(), unit="s", utc=True),
-        freq      = pd.Timedelta(seconds=h.Interval()),
-        inclusive = "left",
+        start=pd.to_datetime(h.Time(), unit="s", utc=True),
+        end=pd.to_datetime(h.TimeEnd(), unit="s", utc=True),
+        freq=pd.Timedelta(seconds=h.Interval()), inclusive="left",
     ).tz_convert(TIMEZONE)
 
     df_h = pd.DataFrame({
         "datetime"               : dates_h,
         "temp_C"                 : h.Variables(0).ValuesAsNumpy(),
-        "humidite_air_pct"       : h.Variables(1).ValuesAsNumpy(),
+        "pluie_mm"               : h.Variables(1).ValuesAsNumpy(),
         "vent_10m_kmh"           : h.Variables(2).ValuesAsNumpy(),
-        "temp_sol_6cm"           : h.Variables(3).ValuesAsNumpy(),
-        "humidite_sol_9_27cm_m3" : h.Variables(4).ValuesAsNumpy(),
-        "humidite_sol_1_3cm_m3"  : h.Variables(5).ValuesAsNumpy(),
+        "temp_sol_0_7cm"         : h.Variables(3).ValuesAsNumpy(),
+        "humidite_sol_7_28cm_m3" : h.Variables(4).ValuesAsNumpy(),
+        "humidite_air_pct"       : h.Variables(5).ValuesAsNumpy(),
+        "humidite_sol_0_7cm_m3"  : h.Variables(6).ValuesAsNumpy(),
     })
-    # Noms attendus par _construire_features
-    df_h["humidite_sol_7_28cm_pct"] = (df_h["humidite_sol_9_27cm_m3"] * 100).round(1)
-    df_h["humidite_sol_0_7cm_pct"]  = (df_h["humidite_sol_1_3cm_m3"]  * 100).round(1)
+    df_h["humidite_sol_7_28cm_pct"] = (df_h["humidite_sol_7_28cm_m3"] * 100).round(1)
+    df_h["humidite_sol_0_7cm_pct"]  = (df_h["humidite_sol_0_7cm_m3"]  * 100).round(1)
     df_h["date_only"] = pd.to_datetime(df_h["datetime"]).dt.date
 
-    # Quotidien
     d = r.Daily()
     dates_d = pd.date_range(
-        start     = pd.to_datetime(d.Time(),    unit="s", utc=True),
-        end       = pd.to_datetime(d.TimeEnd(), unit="s", utc=True),
-        freq      = pd.Timedelta(seconds=d.Interval()),
-        inclusive = "left",
+        start=pd.to_datetime(d.Time(), unit="s", utc=True),
+        end=pd.to_datetime(d.TimeEnd(), unit="s", utc=True),
+        freq=pd.Timedelta(seconds=d.Interval()), inclusive="left",
     ).tz_convert(TIMEZONE)
 
     df_q = pd.DataFrame({
         "date"              : dates_d.date,
-        "temp_max_C"        : d.Variables(0).ValuesAsNumpy(),
-        "temp_min_C"        : d.Variables(1).ValuesAsNumpy(),
-        "vent_max_kmh"      : d.Variables(2).ValuesAsNumpy(),
-        "rayonnement_Rs_MJ" : d.Variables(3).ValuesAsNumpy(),
-        "ET0_reference_mm"  : d.Variables(4).ValuesAsNumpy(),
-        "pluie_totale_mm"   : d.Variables(5).ValuesAsNumpy(),
-        "pluie_rain_mm"     : d.Variables(6).ValuesAsNumpy(),
+        "temp_moy_C"        : d.Variables(0).ValuesAsNumpy(),
+        "temp_max_C"        : d.Variables(1).ValuesAsNumpy(),
+        "temp_min_C"        : d.Variables(2).ValuesAsNumpy(),
+        "vent_max_kmh"      : d.Variables(3).ValuesAsNumpy(),
+        "rayonnement_Rs_MJ" : d.Variables(4).ValuesAsNumpy(),
+        "ET0_reference_mm"  : d.Variables(5).ValuesAsNumpy(),
+        "pluie_totale_mm"   : d.Variables(6).ValuesAsNumpy(),
     })
-    # temp_moy_C calcule depuis max et min (identique a 06_api_openmeteo.py)
-    df_q["temp_moy_C"] = ((df_q["temp_max_C"] + df_q["temp_min_C"]) / 2).round(1)
-
     return df_h, df_q
 
 
@@ -525,5 +502,3 @@ if __name__ == "__main__":
         port=8000,
         reload=False,   # reload=False evite les conflits de fichiers
     )
-
-    
