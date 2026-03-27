@@ -1,306 +1,77 @@
-<div align="center">
+# Water5 - Irrigation Intelligente
 
-<img src="app web/icons/icon.png" alt="Water5 Logo" width="120" height="120" style="border-radius:20px"/>
+## Description
 
-# Water5 — Irrigation Intelligente par IA
+Water5 est un système d'irrigation intelligente utilisant l'intelligence artificielle pour aider les maraîchers à irriguer au bon moment et avec le bon volume d'eau. Le système analyse les données météorologiques en temps réel, applique des modèles de machine learning, et fournit des recommandations d'irrigation via une application web.
 
-**Systeme d'irrigation intelligente pour petits producteurs maraichetres**  
-Yamoussoukro, Cote d'Ivoire · Tomate 200m² · Groupe Money Time · AQUATECH 2026
+## Fonctionnalités
 
-[![Python](https://img.shields.io/badge/Python-3.13-3776AB?style=flat&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-3.0-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Accuracy](https://img.shields.io/badge/Accuracy_ML-100%25-2D6A4F?style=flat)](https://github.com)
-[![R2](https://img.shields.io/badge/R²_Regression-0.9954-40916C?style=flat)](https://github.com)
-[![License](https://img.shields.io/badge/License-MIT-F4A261?style=flat)](LICENSE)
+- **Analyse météorologique** : Récupération des données d'Open-Meteo
+- **Modèles ML** : Classification (oui/non irrigation) et régression (volume d'eau)
+- **Application web** : Interface PWA pour consulter les décisions
+- **API** : Serveur FastAPI pour l'intégration
+- **Évaluation** : Scripts pour backtesting et évaluation des modèles
 
-</div>
+## Installation
 
----
+1. Cloner le dépôt :
 
-## Apercu
+   ```bash
+   git clone https://github.com/sakitO122/Water5.git
+   cd Water5
+   ```
 
-Water5 est un systeme d'irrigation intelligente qui combine **Machine Learning**, **meteorologie en temps reel** et **automatisation electronique** pour aider les maraiculteurs ivoiriens a irriguer au bon moment, avec le bon volume d'eau.
+2. Installer les dépendances :
 
-Le systeme analyse chaque matin les donnees meteorologiques d'Open-Meteo, applique le bilan hydrique FAO-56 avec un Kc dynamique, et produit une decision d'irrigation accompagnee du volume exact en litres — affichee sur une application web mobile et envoyee au relais Arduino qui commande physiquement la pompe.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-```
-Open-Meteo API → Random Forest (100% acc.) → Decision OUI/NON + Volume (L)
-                                           → App Web PWA
-                                           → Arduino LCD + Relais + Pompe
-```
+3. Préparer les données et entraîner les modèles :
+   ```bash
+   python src/01_preparation_donnees.py
+   python src/02_entrainement_ml.py
+   ```
 
----
+## Utilisation
 
-## Resultats du modele ML
-
-| Indicateur | Valeur | Interpretation |
-|---|---|---|
-| Accuracy | **100.0 %** | Aucune erreur sur le jeu de test |
-| F1-score | **1.0000** | Equilibre precision/rappel parfait |
-| AUC-ROC | **1.0000** | Capacite discriminante maximale |
-| R² Regression | **0.9954** | 99.54 % de la variance expliquee |
-| MAE Volume | **23.1 L** | Erreur moyenne sur le volume |
-| CV 5-fold | **99.63 % ± 0.34 %** | Robustesse temporelle |
-| Dataset | **1 096 jours** | 2022-2024, Yamoussoukro |
-
----
-
-## Architecture
-
-```
-water5/
-├── app web/                    # Application web PWA
-│   ├── index.html              # Interface 5 ecrans
-│   ├── style.css               # Design sombre vert
-│   ├── app.js                  # Logique frontend
-│   ├── manifest.json           # Config PWA
-│   ├── sw.js                   # Service Worker
-│   └── icons/
-│       └── icon.png            # Logo Water5
-│
-├── src/                        # Code Python
-│   ├── config.py               # Constantes centralisees
-│   ├── agronomie.py            # FAO-56 Penman-Monteith + Kc tomate
-│   ├── api.py                  # Serveur FastAPI (pont app web ↔ ML)
-│   ├── 01_preparation_donnees.py
-│   ├── 02_entrainement_ml.py
-│   ├── 04_backtesting.py
-│   ├── 05_evaluation.py
-│   └── 06_api_openmeteo.py     # Prediction en ligne de commande
-│
-├── models/                     # Modeles entraines (generes)
-│   ├── modele_classification.joblib
-│   └── modele_regression.joblib
-│
-├── data/                       # Donnees (generes)
-│   ├── open_meteo_brut.csv
-│   └── yamoussoukro_dataset_ML.csv
-│
-├── outputs/                    # Graphiques et logs (generes)
-├── requirements.txt
-└── README.md
-```
-
----
-
-## Demarrage rapide
-
-### 1. Cloner le depot
-
-```bash
-git clone https://github.com/TON_USERNAME/water5.git
-cd water5
-```
-
-### 2. Installer les dependances
-
-```bash
-pip install -r requirements.txt
-```
-
-### 3. Preparer les donnees et entrainer le modele
-
-```bash
-python src/01_preparation_donnees.py
-python src/02_entrainement_ml.py
-```
-
-### 4. Lancer le serveur API
+### Lancer l'application web
 
 ```bash
 cd src
 python api.py
 ```
 
-### 5. Ouvrir l'application web
+Ouvrez votre navigateur à l'adresse `http://localhost:8000` pour accéder à l'application.
 
-```
-http://localhost:8000
-```
+### Utilisation en ligne de commande
 
-Cliquer sur **Analyser mon champ** — le modele appelle Open-Meteo en temps reel et affiche la decision.
+- Obtenir une décision d'irrigation :
 
----
+  ```bash
+  python src/06_api_openmeteo.py
+  ```
 
-## Utilisation en ligne de commande
+- Évaluer le modèle :
+  ```bash
+  python src/05_evaluation.py
+  ```
 
-```bash
-# Decision du jour (sans Arduino)
-python src/06_api_openmeteo.py
+## Structure du projet
 
-# Avec capteur Arduino sur port COM4
-python src/06_api_openmeteo.py --port COM4
+- `app web/` : Application web PWA
+- `src/` : Scripts Python (préparation, entraînement, API)
+- `models/` : Modèles ML entraînés
+- `data/` : Données météorologiques et dataset
+- `outputs/` : Résultats et rapports
 
-# Afficher les donnees brutes Open-Meteo
-python src/06_api_openmeteo.py --test
+## Technologies
 
-# Evaluation complete du modele
-python src/05_evaluation.py
-
-# Backtesting sur une date historique
-python src/04_backtesting.py 2023-06-15
-```
-
----
-
-## Flux de donnees
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    OPEN-METEO API                        │
-│  temperature · ET0 · pluie · humidite sol · rayonnement │
-└──────────────────────┬──────────────────────────────────┘
-                       │ appel direct (sans cache)
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│               BILAN HYDRIQUE FAO-56                      │
-│  ET0 × Kc(dynamique) → ETc → Deficit = ETc - Pluie_eff │
-└──────────────────────┬──────────────────────────────────┘
-                       │ 16 features
-                       ▼
-┌─────────────────────────────────────────────────────────┐
-│           RANDOM FOREST (Water5 2022-2024)               │
-│  Classification : OUI/NON    Regression : Volume (L)     │
-│  Accuracy 100%  F1=1.0       R²=0.9954  MAE=23.1L       │
-└────────────┬──────────────────────────┬─────────────────┘
-             │                          │
-             ▼                          ▼
-┌────────────────────┐    ┌─────────────────────────────┐
-│   APPLICATION WEB  │    │      ARDUINO UNO            │
-│   localhost:8000   │    │  LCD + Relais + Pompe 12V   │
-│   PWA Mobile       │    │  DHT22 + Capteur Sol        │
-└────────────────────┘    └─────────────────────────────┘
-```
-
----
-
-## Variables meteorologiques
-
-| Variable | Source | Role dans le modele |
-|---|---|---|
-| Humidite sol 9-27 cm (%) | Open-Meteo | Zone racinaire tomate |
-| ET0 reference (mm/j) | Open-Meteo | Evapotranspiration FAO |
-| Temperature max/min/moy (°C) | Open-Meteo | Bilan energetique |
-| Precipitation totale (mm) | Open-Meteo | Apport hydrique |
-| Rayonnement solaire (MJ/m²) | Open-Meteo | Calcul ET0 |
-| Humidite relative air (%) | Open-Meteo | Calcul Kc dynamique |
-| Vent u2 (m/s) | Calcule | Correction Kc + ET0 |
-| ETc culture (mm) | Calcule | ET0 × Kc |
-| Deficit hydrique (mm) | Calcule | Feature principale |
-| Kc dynamique | Calcule | Stade + saison + RH + vent |
-
----
-
-## Dispositif Arduino
-
-| Broche | Composant | Fonction |
-|---|---|---|
-| D2 | DHT22 | Temperature + Humidite air |
-| D3-D5 | LCD D6-D4 | Donnees affichage |
-| D8 | LED verte | Etat pas d'irrigation |
-| D9 | LED rouge | Etat irrigation active |
-| D11 | LCD Enable | Signal Enable |
-| D12 | LCD RS | Register Select |
-| D13 | Relais IN | Commande pompe 12V |
-| A0 | Capteur sol YL-69 | Humidite sol analogique |
-
----
-
-## API Endpoints
-
-Une fois `api.py` lance sur `localhost:8000` :
-
-| Endpoint | Methode | Description |
-|---|---|---|
-| `/` | GET | Application web (index.html) |
-| `/analyser` | GET | Decision complete J+3 (identique a 06_api_openmeteo.py) |
-| `/health` | GET | Verification modeles charges |
-| `/decision` | POST | Decision depuis donnees client |
-| `/docs` | GET | Documentation Swagger automatique |
-
-```bash
-# Exemple appel /analyser
-curl http://localhost:8000/analyser?jour_cycle=60
-
-# Reponse JSON
-{
-  "aujourd_hui": {
-    "irriguer": true,
-    "volume_L": 1441.0,
-    "confiance_pct": 100.0,
-    "deficit_mm": 4.48,
-    "kc": 1.1557,
-    "stade": "mi_saison"
-  },
-  "previsions": [...]
-}
-```
-
----
-
-## Dependances principales
-
-```
-pandas>=1.5          numpy>=1.23         scikit-learn>=1.2
-joblib>=1.2          matplotlib>=3.6      fastapi>=0.100
-uvicorn>=0.22        openmeteo-requests   retry-requests
-pyserial>=3.5        pydantic>=2.0
-```
-
-Installation :
-
-```bash
-pip install -r requirements.txt
-```
-
----
-
-## Contexte du projet
-
-Water5 a ete developpe dans le cadre du **concours AQUATECH 2026** par le **Groupe Money Time** a Yamoussoukro, Cote d'Ivoire.
-
-Le systeme est concu pour les petits producteurs maraichetres sans acces aux technologies de precision agricole. Il est :
-
-- **Abordable** — materiel < 20 000 F CFA pour la partie electronique
-- **Autonome** — fonctionne avec une connexion Internet et un PC
-- **Precis** — modele ML calibre sur 3 ans de donnees locales Yamoussoukro
-- **Extensible** — adaptable a d'autres cultures et d'autres regions
-
----
-
-## Structure du dataset
-
-```
-Periode          : 2022-2024 (1 096 jours)
-Localisation     : Yamoussoukro — 6.82°N, 5.28°W, 212m
-Culture          : Tomate (Lycopersicum esculentum)
-Parcelle         : 200 m²
-Irrigations      : 822 jours OUI (75%) / 274 jours NON (25%)
-Split            : 80/20 chronologique (train/test)
-Source donnees   : Open-Meteo Historical API
-```
-
----
-
-## Reference
-
-> Allen, R.G., Pereira, L.S., Raes, D., Smith, M. (1998).  
-> *Crop evapotranspiration — Guidelines for computing crop water requirements.*  
-> FAO Irrigation and Drainage Paper No. 56. Rome.
-
----
+- Python 3.13
+- FastAPI
+- Scikit-learn (Random Forest)
+- Open-Meteo API
 
 ## Licence
 
-Ce projet est distribue sous licence **MIT**.  
-Voir le fichier [LICENSE](LICENSE) pour les details.
-
----
-
-<div align="center">
-
-**Groupe Money Time · Yamoussoukro, Cote d'Ivoire · 2026**
-
-*Water5 — De l'eau au bon moment, en bonne quantite, grace a l'IA*
-
-</div>
+MIT
